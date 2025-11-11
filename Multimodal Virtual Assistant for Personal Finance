@@ -1,0 +1,120 @@
+!pip install -U openai-whisper
+!pip install -U transformers
+!pip install langgraph
+!pip install torchaudio
+!apt-get install ffmpeg -y
+
+# Import modules
+import whisper
+from transformers import pipeline
+from langgraph.graph import StateGraph
+import os
+from typing import TypedDict
+
+# Mock transaction dataset
+user_data = {
+    "transactions": [
+        {"date": "2025-07-01", "category": "Groceries", "amount": 30.5},
+        {"date": "2025-07-02", "category": "Transport", "amount": 12.0},
+        {"date": "2025-07-03", "category": "Entertainment", "amount": 20.0},
+        {"date": "2025-07-04", "category": "Groceries", "amount": 18.5}
+    ]
+}
+
+# Speech recognition with Whisper
+def whisper_recognition(state: dict):
+    try:
+        audio_path = state["audio_path"]
+        model = whisper.load_model("small")
+        result = model.transcribe(audio_path, language="it")
+        text = result["text"]
+        return {**state, "text": text}
+    except Exception as e:
+        print(f"[ASR] recognition error: {e}")
+        return {**state, "text": "I couldn't understand your message, would you like to try again?"}
+
+# Natural Language Understanding: intent detection
+nlp = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+def analyze_text(state: dict):
+    try:
+        text = state["text"]
+        intents = ["weekly_spending_check", "category_spending"]
+        result = nlp(text, candidate_labels=intents)
+        intent = result["labels"][0] if result["scores"][0] > 0.5 else "unrecognized_intent"
+        print(f"[NLP] {intent}")
+        return {**state, "intent": intent}
+    except Exception as e:
+        print(f"[NLP] error: {e}")
+        return {**state, "intent": "unrecognized_intent"}
+
+# Helper function
+def calculate_category_spending(category):
+    return sum(t["amount"] for t in user_data["transactions"] if t["category"].lower() == category.lower())
+
+# Response generation
+def generate_response(state: dict):
+    intent = state.get("intent")
+    text = state.get("text")
+
+    if intent == "weekly_spending_check":
+        total = sum(t["amount"] for t in user_data["transactions"])
+        response = f"You spent {total} euros this week."
+
+    elif intent == "category_spending":
+        for category in ["groceries", "transport", "entertainment"]:
+            if category in text.lower():
+                total_cat = calculate_category_spending(category)
+                response = f"You spent {total_cat} euros on {category}."
+                break
+        else:
+            response = "Please specify a spending category."
+
+    else:
+        response = "Sorry, I didn't understand your request."
+
+    print(f"[Response] {response}")
+    return {**state, "response": response}
+
+# LangGraph: conversational flow
+class AssistantState(TypedDict):
+    audio_path: str
+    text: str
+    intent: str
+    response: str
+
+graph = StateGraph(AssistantState)
+
+graph = StateGraph(dict)
+graph.add_node("ASR", whisper_recognition)
+graph.add_node("NLP", analyze_text)
+graph.add_node("response", generate_response)
+graph.set_entry_point("ASR")
+graph.add_edge("ASR", "NLP")
+graph.add_edge("NLP", "response")
+
+assistant = graph.compile()
+
+# Execution
+def virtual_assistant(audio_path):
+    print("Starting financial interaction...")
+
+    if not os.path.exists(audio_path) or not audio_path:
+        print("[INFO] No audio found, using sample input.")
+
+        initial_state = {
+            "audio_path": audio_path,
+            "text": "How much did I spend this week?"
+        }
+
+        initial_state = analyze_text(initial_state)
+        final_result = generate_response(initial_state)
+    else:
+        initial_state = {"audio_path": audio_path}
+        final_result = assistant.invoke(initial_state)
+
+    print(f"\n[ASSISTANT RESPONSE]:\n{final_result['response']}\n")
+    print("Interaction complete")
+
+if __name__ == '__main__':
+    virtual_assistant("")  # insert audio file path
