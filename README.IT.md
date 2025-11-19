@@ -1,5 +1,7 @@
 # Assistente Virtuale Multimodale per la Finanza Personale
 
+Progetto fatto durante il Master in AI Developer di Profession AI
+
 Un progetto innovativo sviluppato in **Google Colab** che combina riconoscimento vocale, NLP avanzato e analisi dati per offrire un assistente virtuale capace di comprendere e rispondere a richieste finanziarie in modo naturale e personalizzato.
 
 ## Funzionalità principali
