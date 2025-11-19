@@ -1,5 +1,7 @@
 # Multimodal Virtual Assistant for Personal Finance
 
+Project developed during the Master in AI Developer at Profession AI
+
 An innovative project developed in **Google Colab** that combines speech recognition, advanced NLP, and data analysis to deliver a virtual assistant capable of understanding and responding to financial queries in a natural and personalized way.
 
 ## Key Features
